@@ -1,0 +1,8 @@
+{
+  "name": "ui_line_draft",
+  "id": "12079887483210459786244",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma", "figjam"]
+}
