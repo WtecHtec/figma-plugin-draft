@@ -114,3 +114,6 @@
 .flex-1 pre {
   min-height: 500px;
 }
+body {
+  position: relative;
+}

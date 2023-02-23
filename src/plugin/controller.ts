@@ -21,36 +21,41 @@ figma.ui.onmessage = (msg) => {
     if ( selecteNode ) {
       figma.currentPage.selection = [selecteNode];
     }
-  }
-
-  if (msg.type === 'create-rectangles') {
-    const nodes = [];
+  } else if (msg.type === 'import') {
     const selections: any =  figma.currentPage.selection
     console.log(selections)
-    console.log(figma)
-    // selections.name = '测试*'
-    for (let i = 0; i < 1; i++) {
-      const rect = figma.createRectangle();
-      rect.name = '这是一个矩形';
-      rect.x = i * 150;
-      rect.fills = [{ type: 'SOLID', color: { r: 1, g: 0.5, b: 0 } }];
-      figma.currentPage.appendChild(rect);
-      nodes.push(rect);
+    if (Array.isArray(selections) && selections.length === 1) { 
+      const rootNode = {}
+      const [selection] = selections;
+      createTreeNode(rootNode, selection)
+      figma.ui.postMessage({
+        type: msg.type,
+        message: {
+          rootNode,
+          kid: selection.id,
+          name: selection.name,
+        } ,
+      });
+    } else {
+      figma.notify('请选中一个节点')
     }
-
-    // figma.currentPage.selection = nodes;
-    figma.viewport.scrollAndZoomIntoView(nodes);
-    // console.log('main nodes===', figma.root.children);
-
-
-    // This is how figma responds back to the ui
-    figma.ui.postMessage({
-      type: 'create-rectangles',
-      message: `Created ${msg.count} Rectangles`,
-    });
-  }
-  // setTimeout(()=> {
-  //   figma.closePlugin();
-  // }, 2000)
+  } 
 
 };
+
+const createTreeNode = (root,node) => {
+  if (node) {
+    root.key = node.id
+    root.title = node.name,
+    root.nodeType = 'view',
+    root.data = {
+      nodeShow: true,
+      nodeType: 'view',
+    }
+    root.children = []
+    if (node.type !== 'GROUP' && node.children && Array.isArray(node.children)) {
+      node.children.forEach(item => root.children.push(createTreeNode({}, item)))
+    }
+  }
+  return root
+}

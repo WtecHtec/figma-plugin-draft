@@ -3,7 +3,7 @@ import '../styles/ui.css';
 import TreeMenu from './treemenu';
 import SettingView from './setting';
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
-import { Space, Button, Divider  } from 'antd';
+import { Space, Button, Divider,Form , Select  } from 'antd';
 import { CSS_RULES } from '../assets/atom/css_rules';
 import { STYLE_MIXIN } from '../assets/atom/style-mixin';
 import 'antd/dist/reset.css';
@@ -20,6 +20,9 @@ let gAtomRules = [];
 let gArrayRules = [];
 let gAfPseudoRules = [];
 let gBePseudoRules = [];
+let gExDomType: string = 'view';
+let gExStyleType: string = 'atom';
+let gNodeData = [];
 const InitRules = () => {
   postcss().process(CSS_RULES, { from: undefined })
     .then(result => {
@@ -87,7 +90,7 @@ function App() {
     window.onmessage = (event) => {
       console.log('window.onmessage===1')
       const { type, message } = event.data.pluginMessage;
-      if (type === 'join') {
+      if (['join', 'import'].includes(type)) {
         setPluginMessage(event.data.pluginMessage)
       }
       if (type === 'create-rectangles') {
@@ -124,7 +127,7 @@ function App() {
       <div class="page" > ${(rootDom as any).innerHTML} </div> 
     `;
   }
-  const runView = async (domDatas, elType = 'div', opt = 'view') => {
+  const runView = async (domDatas, elType = 'div', opt = 'view', styleType = 'atom') => {
     // console.log('DATAS===', DATAS,  colors[0][0], gRuleNodes)
     let colorIndex = 0;
     const remaCss = []
@@ -145,7 +148,7 @@ function App() {
         const el = document.createElement(elType)
         parentDom.appendChild(el);
         if (cssCode) {
-          const [atomCls, clsName, atomRoot, pseudoRoot, pseudoClsName] = await transformCss(cssCode);
+          const [atomCls, clsName, atomRoot, pseudoRoot, pseudoClsName] = await transformCss(cssCode, styleType);
           remaCss.push({
             clsName, atomRoot, pseudoRoot, pseudoClsName
           })
@@ -215,7 +218,7 @@ function App() {
       })
       return [result, ruleNodes]
     }
-    const transformCss = async (cssCode) => {
+    const transformCss = async (cssCode, styleType = 'atom') => {
       let atomCls = [];
       let atomRemains = [];
       let pseudoRemains = [];
@@ -231,12 +234,16 @@ function App() {
         // 单个
         if (atomRules && atomRules.type === 'rule' && Array.isArray(atomRules.nodes)) {
           atomRules.nodes = initMixin(atomRules.nodes)
-          let [cls, rema] = getGatherAtomCss([...gArrayRules, ..._arrayRules], atomRules.nodes, '')
-          atomCls = [...atomCls, ...cls];
-          atomRules.nodes = rema;
-          [cls, rema] = getGatherAtomCss([...gAtomRules, ..._atomRules],  atomRules.nodes, '')
-          atomCls = [...atomCls, ...cls];
-          atomRemains = rema
+          if (styleType === 'atom') {
+            let [cls, rema] = getGatherAtomCss([...gArrayRules, ..._arrayRules], atomRules.nodes, '')
+            atomCls = [...atomCls, ...cls];
+            atomRules.nodes = rema;
+            [cls, rema] = getGatherAtomCss([...gAtomRules, ..._atomRules],  atomRules.nodes, '')
+            atomCls = [...atomCls, ...cls];
+            atomRemains = rema
+          } else {
+            atomRemains = atomRules.nodes
+          }
         }  
         if (pseudoRules 
           && pseudoRules.type === 'rule' 
@@ -245,11 +252,15 @@ function App() {
           const { selector } = pseudoRules
           pseudoType = selector.indexOf('::after') !== -1 ? '::after' : '::before'
           pseudoRules.nodes = initMixin(pseudoRules.nodes)
-          const [cls, rema] = getGatherAtomCss(pseudoType.indexOf('::after') !== -1 
-            ? [...gAfPseudoRules, ..._afPseudoRules] 
-            : [...gBePseudoRules, ..._bePseudoRules], pseudoRules.nodes, pseudoType)
-          atomCls = [...atomCls, ...cls];
-          pseudoRemains = rema
+          if (styleType === 'atom') {
+            const [cls, rema] = getGatherAtomCss(pseudoType.indexOf('::after') !== -1 
+              ? [...gAfPseudoRules, ..._afPseudoRules] 
+              : [...gBePseudoRules, ..._bePseudoRules], pseudoRules.nodes, pseudoType)
+            atomCls = [...atomCls, ...cls];
+            pseudoRemains = rema
+          } else {
+            pseudoRemains = pseudoRules.nodes;
+          }
         }
         if (atomRemains.length) { 
           clsName = uuid(6, 6).toLocaleLowerCase()
@@ -302,23 +313,56 @@ function App() {
  
     return [remaStyle, rootDom]
   }
-  const onExport = async (domDatas) => {
-    const [remaStyle, rootDom] = await runView(domDatas, 'view', 'export')
+  const onExport = async (domDatas, domType = 'view', styleType = 'atom' ) => {
+    const [remaStyle, rootDom] = await runView(domDatas, domType, 'export', styleType)
     setExportShow(true)
     setCssCodeString(beautifyCss(remaStyle as string, { indent_size: 2}) )
     setViewCodeString(beautifyHtml((rootDom as any).innerHTML, { indent_size: 2}))
   }
+
+  const handleDomChange = (value: string) => {
+    gExDomType = value;
+    onExport(gNodeData, gExDomType, gExStyleType)
+  };
+
+  const handleStyleChange = (value: string) => {
+    gExStyleType = value
+    onExport(gNodeData, gExDomType, gExStyleType)
+  };
   return (
     <div className='main-plugin'>
       <div className='content'>
         <div className='tree-menu'>
-          <TreeMenu pluginMessage={pluginMessage} onTreeSelet={ onTreeSelet } onExport={(gData) => onExport(gData)} onRender={ (gData)=> (setRunShow(true), setTimeout(()=> renderView(gData) , 0))}></TreeMenu>
+          <TreeMenu pluginMessage={pluginMessage} onTreeSelet={ onTreeSelet } onExport={(gData) => { onExport(gData, gExDomType, gExStyleType), gNodeData = gData }} onRender={ (gData)=> (setRunShow(true), setTimeout(()=> renderView(gData) , 0))}></TreeMenu>
         </div>
         <div className='setting-view'>
           <SettingView treeNode={treeNode} onAction= {onAction} ></SettingView>
         </div>
         <div className={ `render-content ${ exportShow ? 'render-show' : 'render-hide'}`}>
           <Button type="link" onClick={ ()=> setExportShow(false)}>Close</Button>
+          <Form layout={'inline'} style={{ marginBottom: '8px'}}>
+            <Form.Item label="Dom Type" name="">
+              <Select
+                defaultValue="view"
+                onChange={handleDomChange}
+                dropdownStyle={{ zIndex: 9999}}
+                style={{minWidth: '80px'}}
+                options={[
+                  { value: 'view', label: 'VIEW' },
+                  { value: 'div', label: 'DIV' },
+                ]}/>
+            </Form.Item>
+            <Form.Item label="Style Type">
+              <Select
+                defaultValue="atom"
+                onChange={handleStyleChange}
+                dropdownStyle={{ zIndex: 9999}}
+                options={[
+                  { value: 'basis', label: 'Basis' },
+                  { value: 'atom', label: 'Atom' },
+                ]}/>
+            </Form.Item>
+          </Form>
           <div className='flex'>
             <div className='flex-1'>
               <SyntaxHighlighter language="htmlbars" style={dark}>

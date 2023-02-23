@@ -106,7 +106,7 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
   };
 
   const handleBtn = (type: string) => {
-    if (['join'].includes(type)) {
+    if (['join', 'import'].includes(type)) {
       parent.postMessage({ pluginMessage: { type, } }, '*');
     } else if (type === 'virtual-node') {
       createVirtualNode()
@@ -195,7 +195,7 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
     if (!pluginMessage) return;
     const { type, message } = pluginMessage;
     const data = [...gData];
-    if (type === 'join') {
+    if (['join', 'import'].includes(type)) {
       const findItem =  findNode(data, message.kid);
       if (findItem) {
         msgError('节点已存在!');
@@ -206,7 +206,7 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
       if (parentNode && Array.isArray(parentNode.children)) {
         optNode = parentNode.children;
       } 
-      optNode.push({
+      optNode.push(type === 'import' ? {...message.rootNode} : {
         key: message.kid,
         title: message.name,
         nodeType: 'view',
@@ -232,6 +232,7 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
       {contextHolder}
       <div className='tree-btn-c'>
         <Button type="link" onClick={ ()=> handleBtn('join')}>Join</Button>
+        <Button type="link" onClick={ ()=> handleBtn('import')}>Import</Button>
         <Button type="link" onClick={ ()=> handleBtn('render')}>Render</Button>
         <Button type="link" onClick={ ()=> handleBtn('virtual-node')}>VNode</Button>
         <Button type="link" onClick={ ()=> handleBtn('export')}>Export</Button>
