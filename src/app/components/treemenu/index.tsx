@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Tree, Button, message, Space } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Tree, Button, message, Space, Dropdown } from 'antd';
 import type { DataNode, TreeProps } from 'antd/es/tree';
 import { EyeOutlined, EyeInvisibleOutlined  } from '@ant-design/icons';
 import { uuid } from '../../utils/tools';
-
+import type { MenuProps } from 'antd';
 
        
 const defaultData: any[] = [{
@@ -17,19 +17,15 @@ const defaultData: any[] = [{
 }];
 
 let selectedKey: string = '';
-const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, onRender, onExport } : any) => {
+const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, onRender, onExport, btnOptType, } : any) => {
   const [gData, setGData] = useState(defaultData);
   const [messageApi, contextHolder] = message.useMessage();
-
+  const [curNode, setCurNode] = useState<any>({});
   const msgError = (msg: string) => {
     messageApi.warning(msg);
   };
 
-  const onDragEnter: TreeProps['onDragEnter'] = () => {
-    // console.log(info);
-    // expandedKeys 需要受控时设置
-    // setExpandedKeys(info.expandedKeys)
-  };
+  const onDragEnter: TreeProps['onDragEnter'] = () => {};
   const onSelect: TreeProps['onSelect'] = (selectedKeys) => {
     if (selectedKeys.length === 1) {
       selectedKey = selectedKeys[0] as string;
@@ -117,6 +113,10 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
     }
   }
 
+  useEffect(() => {
+    handleBtn(btnOptType.split('_')[1])
+  }, [btnOptType])
+
   const createVirtualNode = () => {
     const data = [...gData];
     const parentNode = findNode(data, selectedKey);
@@ -137,22 +137,34 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
       });
       setGData([...data]);
   }
-  
-  // const items: MenuProps['items'] = [
-  //   {
-  //     key: 'virtual-node',
-  //     label: (
-  //       <Button type="link" onClick={ ()=> handleBtn('virtual-node')}>Virtual-Node</Button>
-  //     ),
-  //     disabled: true,
-  //   },
-  //   {
-  //     key: 'export',
-  //     label: (
-  //       <Button type="link" onClick={ ()=> handleBtn('export')}>Export</Button>
-  //     ),
-  //   },
-  // ];
+  const delNode = (key) => {
+    const curNode = findNode(gData, key);
+    if (curNode.key === 'parent') return;
+    const datas = [...gData];
+    removeNode(datas, key)
+    selectedKey === key && (selectedKey = '')
+    setGData([...datas])  
+  }
+
+  const checkNodeStatus = (key) => {
+    const curNode = findNode(gData, key);
+    setCurNode({...curNode});
+    if (curNode && curNode.data) {
+      curNode.data.nodeShow = !curNode.data?.nodeShow;
+      setGData([...gData])
+    }
+  }
+
+  const items = (key: any):MenuProps['items'] => [
+      {
+        label: <Button type="link"  danger onClick={ ()=> delNode(key) }>Delete</Button>,
+        key: '1',
+      },
+      {
+        label: <Button type="link" onClick={ ()=> checkNodeStatus(key) }>{ curNode.data?.nodeShow === false ? 'Show' : 'Hidden' }</Button>,
+        key: '2',
+      },
+    ];
 
   const findNode = (nodes: any, kid: string) => {
     let result = null;
@@ -230,24 +242,16 @@ const TreeMenu: React.FC<{[key:string]: any}> = ({ pluginMessage, onTreeSelet, o
   return (
     <div className='tree-c'>
       {contextHolder}
-      <div className='tree-btn-c'>
-        <Button type="link" onClick={ ()=> handleBtn('join')}>Join</Button>
-        <Button type="link" onClick={ ()=> handleBtn('import')}>Import</Button>
-        <Button type="link" onClick={ ()=> handleBtn('render')}>Render</Button>
-        <Button type="link" onClick={ ()=> handleBtn('virtual-node')}>VNode</Button>
-        <Button type="link" onClick={ ()=> handleBtn('export')}>Export</Button>
-        {/* <Dropdown menu={{ items }} trigger={ ['click']} >
-          <a onClick={(e) => e.preventDefault()}>
-            <Space>
-              Action<DownOutlined />
-            </Space>
-          </a>
-        </Dropdown> */}
-      </div>
       <Tree
         className="draggable-tree"
-        titleRender={ (node: any)=> <div className='white-space-nowrap'>{node.title} 
-          <Space style={{ marginLeft: '4px'}}>{ node.data.nodeShow === false ?  <EyeInvisibleOutlined /> : <EyeOutlined /> } </Space></div>}
+        titleRender={ (node: any)=> (
+          <Dropdown menu={ { items: items(node.key) } } trigger={['contextMenu']}>
+            <div className='white-space-nowrap'>
+              {node.title} 
+              <Space style={{ marginLeft: '4px'}}>{ node.data.nodeShow === false ?  <EyeInvisibleOutlined /> : <EyeOutlined /> } </Space>
+            </div>
+          </Dropdown>)
+        }
         draggable
         blockNode
         onDragEnter={onDragEnter}

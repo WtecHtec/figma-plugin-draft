@@ -41,6 +41,9 @@ module.exports = (env, argv) => ({
       filename: 'ui.html',
       chunks: ['ui'],
       cache: false,
+      minify: {
+        collapseWhitespace: true,//删除空格、换行
+      },
     }),
     new InlineChunkHtmlPlugin(HtmlWebpackPlugin, [/ui/]),
   ],

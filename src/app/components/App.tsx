@@ -12,8 +12,12 @@ const postcss = require('postcss');
 import { uuid } from '../utils/tools';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import DaWebSocket from '../utils/websocket';
+import ReMarPadd from '../utils/re-margin-padding'
 const beautifyCss = require('js-beautify').css;
 const beautifyHtml = require('js-beautify').html;
+
+
 
 let gRuleNodes = [];
 let gAtomRules = [];
@@ -48,57 +52,33 @@ const InitRules = () => {
 }
 
 InitRules();
-// const DATAS = [{ 
-//     "key":"parent",
-//     "title":"Layout",
-//     "nodeType":"root",
-//     "data":{"nodeType":"root"},
-//     "children":[
-//       {"key":"AEDFFF","title":"v-AEDFFF","nodeType":"virtual",
-//       "data":{"nodeShow":true, "txtContent": "", "nodeType":"view","cssCode":"{\n  position: ffrelative;\n  width: 80px;\n  height: 80px;\n}::after{position:absolute;\n border: 2px solid #ffffff;}"},
-//         "children":[
-//             {"key":"3:106","title":"Frame 2938","nodeType":"view","data":{"nodeShow":true,"nodeType":"view","cssCode":"{\n  position: ffrelative;\n  width: 100%;\n height: 100%;\n}::after{ @retina_one_px_border: top, #ffffff;\n}"},"children":[]},
-//             {"key":"3:108","title":"Group 89","nodeType":"view","data":{"nodeShow":true,"nodeType":"view","cssCode":"{\n  @ellipsis_lines: 1; \n position: absolute;\n  bottom:0;\n  right:0;\n width: 28px;\n height: 28px;\n}"},"children":[]}
-//           ]}
-//     ]}];
+const daWs = new DaWebSocket('ws:localhost:3010');
+console.log('daWs', daWs)
 function App() {
-  // const textbox = React.useRef<HTMLInputElement>(undefined);
   const [pluginMessage, setPluginMessage] = React.useState();
   const [treeNode, setTreeNode] = React.useState();
   const [runShow, setRunShow] = React.useState(false)
   const [exportShow, setExportShow] = React.useState(false)
   const [viewCodeString, setViewCodeString] = React.useState('')
   const [cssCodeString, setCssCodeString] = React.useState('')
-
-  // const countRef = React.useCallback((element: HTMLInputElement) => {
-  //   if (element) element.value = '1';
-  //   textbox.current = element;
-  // }, []);
-
-  // const onCreate = () => {
-  //   const count = parseInt(textbox.current.value, 10);
-  //   parent.postMessage({ pluginMessage: { type: 'create-rectangles', count } }, '*');
-  // };
-
-  // const onCancel = () => {
-  //   parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
-  // };
-
+  const [curPath, setCurPath] = React.useState('')
+  const [btnOptType, setBtnOptType] = React.useState('')
   React.useEffect(() => {
     console.log('window.onmessage===', Math.random())
     // This is how we read messages sent from the plugin controller
     window.onmessage = (event) => {
-      console.log('window.onmessage===1')
       const { type, message } = event.data.pluginMessage;
       if (['join', 'import'].includes(type)) {
         setPluginMessage(event.data.pluginMessage)
       }
-      if (type === 'create-rectangles') {
-        console.log(`Figma Says: ${message}`);
-      }
       const selor =  document.getElementsByClassName('object_row--selected--obsqL')
-      console.log('selor===', window.parent, selor)
+      console.log('selor===', window.parent, selor , message)
     };
+
+    daWs.watch('setFigmaPath', (data) => {
+      setCurPath(data.data)
+    })
+
   }, []);
 
   const onTreeSelet = (value: any) => {
@@ -128,7 +108,6 @@ function App() {
     `;
   }
   const runView = async (domDatas, elType = 'div', opt = 'view', styleType = 'atom') => {
-    // console.log('DATAS===', DATAS,  colors[0][0], gRuleNodes)
     let colorIndex = 0;
     const remaCss = []
     const _arrayRules = []
@@ -148,7 +127,7 @@ function App() {
         const el = document.createElement(elType)
         parentDom.appendChild(el);
         if (cssCode) {
-          const [atomCls, clsName, atomRoot, pseudoRoot, pseudoClsName] = await transformCss(cssCode, styleType);
+          const [atomCls, clsName, atomRoot, pseudoRoot, pseudoClsName] = await transformCss(cssCode.toLowerCase(), styleType);
           remaCss.push({
             clsName, atomRoot, pseudoRoot, pseudoClsName
           })
@@ -227,7 +206,7 @@ function App() {
       let pseudoType = ''
       let atomRoot = ''
       let pseudoRoot = ''
-      const cssRules = await postcss().process(cssCode, { from: undefined })
+      const cssRules = await postcss([ReMarPadd]).process(cssCode, { from: undefined })
         .then(result => result.root.nodes);
       if (cssRules.length <= 2) {
         const [atomRules, pseudoRules] = cssRules;
@@ -329,65 +308,90 @@ function App() {
     gExStyleType = value
     onExport(gNodeData, gExDomType, gExStyleType)
   };
+  const handleSendApc = () => {
+    daWs.fetch(JSON.stringify({
+      type: 'sendFigmaView',
+      payload: {
+        path: curPath,
+        content: {
+          '.wxml': viewCodeString,
+          '.wxss': cssCodeString,
+        },
+      },
+    }), () => {});
+  }
+  const handleBtn = (type: string) => {
+    setBtnOptType(`${Math.random()}_${type}` )
+  }
   return (
     <div className='main-plugin'>
+      <div className='tree-btn-c'>
+          <Button type="link" onClick={ ()=> handleBtn('join')}>Join</Button>
+          <Button type="link" onClick={ ()=> handleBtn('import')}>Import</Button>
+          <Button type="link" onClick={ ()=> handleBtn('render')}>Render</Button>
+          <Button type="link" onClick={ ()=> handleBtn('virtual-node')}>VNode</Button>
+          <Button type="link" onClick={ ()=> handleBtn('export')}>Export</Button>
+      </div>
       <div className='content'>
         <div className='tree-menu'>
-          <TreeMenu pluginMessage={pluginMessage} onTreeSelet={ onTreeSelet } onExport={(gData) => { onExport(gData, gExDomType, gExStyleType), gNodeData = gData }} onRender={ (gData)=> (setRunShow(true), setTimeout(()=> renderView(gData) , 0))}></TreeMenu>
+          <TreeMenu btnOptType={btnOptType} pluginMessage={pluginMessage} onTreeSelet={ onTreeSelet } onExport={(gData) => { onExport(gData, gExDomType, gExStyleType), gNodeData = gData }} onRender={ (gData)=> (setRunShow(true), setTimeout(()=> renderView(gData) , 0))}></TreeMenu>
         </div>
         <div className='setting-view'>
           <SettingView treeNode={treeNode} onAction= {onAction} ></SettingView>
-        </div>
-        <div className={ `render-content ${ exportShow ? 'render-show' : 'render-hide'}`}>
-          <Button type="link" onClick={ ()=> setExportShow(false)}>Close</Button>
-          <Form layout={'inline'} style={{ marginBottom: '8px'}}>
-            <Form.Item label="Dom Type" name="">
-              <Select
-                defaultValue="view"
-                onChange={handleDomChange}
-                dropdownStyle={{ zIndex: 9999}}
-                style={{minWidth: '80px'}}
-                options={[
-                  { value: 'view', label: 'VIEW' },
-                  { value: 'div', label: 'DIV' },
-                ]}/>
-            </Form.Item>
-            <Form.Item label="Style Type">
-              <Select
-                defaultValue="atom"
-                onChange={handleStyleChange}
-                dropdownStyle={{ zIndex: 9999}}
-                options={[
-                  { value: 'basis', label: 'Basis' },
-                  { value: 'atom', label: 'Atom' },
-                ]}/>
-            </Form.Item>
-          </Form>
-          <div className='flex'>
-            <div className='flex-1'>
-              <SyntaxHighlighter language="htmlbars" style={dark}>
-                {viewCodeString}
-              </SyntaxHighlighter>
-            </div>
-            <Divider type="vertical" />
-            <div className='flex-1'>
-              <SyntaxHighlighter language="css" style={dark}>
-                {cssCodeString}
-              </SyntaxHighlighter>
-            </div>
-          </div>
         </div>
       </div>
       <div className="run-view" draggable style={{ display: runShow ? 'block' : 'none'}}>
         <div id="hostElement" draggable></div>
       </div>
       <div> 
-          <Space style={{ cursor: 'pointer'}}>
+          <Space style={{ cursor: 'pointer'}} size={8}>
             { !runShow
               ? <EyeOutlined onClick={() => (setRunShow(true))} /> 
               : <EyeInvisibleOutlined onClick={() => (setRunShow(false))} />
             } 
+            <Space>{curPath}</Space>
           </Space>
+         
+      </div>
+      <div className={ `render-content ${ exportShow ? 'render-show' : 'render-hide'}`}>
+        <Button type="link" onClick={ ()=> setExportShow(false)}>Close</Button>
+        { curPath ? <Button type="link" onClick={ ()=> handleSendApc()}>Send APC</Button> : ''} 
+        <Form layout={'inline'} style={{ marginBottom: '8px'}}>
+          <Form.Item label="Dom Type" name="">
+            <Select
+              defaultValue="view"
+              onChange={handleDomChange}
+              dropdownStyle={{ zIndex: 9999}}
+              style={{minWidth: '80px'}}
+              options={[
+                { value: 'view', label: 'VIEW' },
+                { value: 'div', label: 'DIV' },
+              ]}/>
+          </Form.Item>
+          <Form.Item label="Style Type">
+            <Select
+              defaultValue="atom"
+              onChange={handleStyleChange}
+              dropdownStyle={{ zIndex: 9999}}
+              options={[
+                { value: 'basis', label: 'Basis' },
+                { value: 'atom', label: 'Atom' },
+              ]}/>
+          </Form.Item>
+        </Form>
+        <div className='flex'>
+          <div className='flex-1'>
+            <SyntaxHighlighter language="htmlbars" style={dark}>
+              {viewCodeString}
+            </SyntaxHighlighter>
+          </div>
+          <Divider type="vertical" />
+          <div className='flex-1'>
+            <SyntaxHighlighter language="css" style={dark}>
+              {cssCodeString}
+            </SyntaxHighlighter>
+          </div>
+        </div>
       </div>
     </div>
   );
