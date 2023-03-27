@@ -119,3 +119,9 @@
 body {
 	position: relative;
 }
+
+.t-title {
+  width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

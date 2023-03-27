@@ -24,14 +24,19 @@ const TreeMenu: React.FC<{ [key: string]: any }> = ({ pluginMessage, onTreeSelet
 	const msgError = (msg: string) => {
 		messageApi.warning(msg);
 	};
+  console.log('init', msgError);
 
 	const onDragEnter: TreeProps['onDragEnter'] = () => { };
 	const onSelect: TreeProps['onSelect'] = (selectedKeys) => {
 		if (selectedKeys.length === 1) {
 			selectedKey = selectedKeys[0] as string;
 			const parentNode = findNode(gData, selectedKey);
-			onTreeSelet(parentNode);
-			parent.postMessage({ pluginMessage: { type: 'selected', message: { selectedKey, } } }, '*');
+      if (parentNode) {
+        onTreeSelet(parentNode);
+        parent.postMessage({ pluginMessage: { type: 'selected', message: { selectedKey: parentNode.kid, } } }, '*');
+      } else {
+        console.error(' parentNode find error')
+      }
 		}
 	}
 	const onDrop: TreeProps['onDrop'] = (info) => {
@@ -208,23 +213,26 @@ const TreeMenu: React.FC<{ [key: string]: any }> = ({ pluginMessage, onTreeSelet
 		const { type, message } = pluginMessage;
 		const data = [...gData];
 		if (['join', 'import'].includes(type)) {
-			const findItem = findNode(data, message.kid);
-			if (findItem) {
-				msgError('节点已存在!');
-				return;
-			}
+			// const findItem = findNode(data, message.kid);
+			// if (findItem) {
+			// 	msgError('节点已存在!');
+			// 	return;
+			// }
 			const parentNode = findNode(data, selectedKey);
 			let optNode = data[0].children;
 			if (parentNode && Array.isArray(parentNode.children)) {
 				optNode = parentNode.children;
 			}
 			optNode.push(type === 'import' ? { ...message.rootNode } : {
-				key: message.kid,
+				key: message.key,
+        kid:  message.kid,
 				title: message.name,
 				nodeType: 'view',
 				data: {
 					nodeShow: true,
 					nodeType: 'view',
+          cssCode: message.cssCode ? `${ message.cssCode }` : '',
+          txtContent:  message.txtContent || '', 
 				},
 				children: [],
 			});
@@ -251,10 +259,11 @@ const TreeMenu: React.FC<{ [key: string]: any }> = ({ pluginMessage, onTreeSelet
 					//     <Space style={{ marginLeft: '4px'}}>{ node.data.nodeShow === false ?  <EyeInvisibleOutlined /> : <EyeOutlined /> } </Space>
 					//   </div>
 					// </Dropdown>
-					<div className="white-space-nowrap flex">
-						{
+					<div className="white-space-nowrap flex" title={node.title} >
+						<div className="t-title"> {node.title} </div>
+            {
 							node.key !== 'parent' ?
-								(<><Space style={{ verticalAlign: 'top' }} onClick={() => checkNodeStatus(node.key)}>
+								(<><Space style={{ marginLeft: '4px', verticalAlign: 'top' }} onClick={() => checkNodeStatus(node.key)}>
 									{/* {curNode.data?.nodeShow === false ? 'Show' : 'Hidden'} */}
 									{node.data.nodeShow === false ? <EyeInvisibleOutlined /> : <EyeOutlined />}
 								</Space><Space style={{ marginLeft: '4px', verticalAlign: 'top' }} onClick={() => delNode(node.key)}> <DeleteOutlined style={{
@@ -263,7 +272,6 @@ const TreeMenu: React.FC<{ [key: string]: any }> = ({ pluginMessage, onTreeSelet
 								}} /> </Space></>
 								) : ''
 						}
-						<Space> {node.title} </Space>
 					</div>
 				)
 				}

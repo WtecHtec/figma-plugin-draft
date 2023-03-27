@@ -1,0 +1,9 @@
+{
+  "name": "即时线稿",
+  "id": "hiaaYjTrxmJmRFkRc7YMH",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": [
+    "jsDesign"
+  ]
+}
